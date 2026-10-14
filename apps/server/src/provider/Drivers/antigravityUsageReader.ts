@@ -214,11 +214,14 @@ const readDatabase = Effect.fn("readDatabase")(function* (
       // Below every rowid.
       let after = -Infinity;
       while (true) {
-        const rows = yield* sql.unsafe<{
-          readonly row_id: number;
-          readonly idx: unknown;
-          readonly data: unknown;
-        }>(query, [after, pageRows]);
+        // Untraced: a cold read runs one of these per generation.
+        const rows = yield* sql
+          .unsafe<{
+            readonly row_id: number;
+            readonly idx: unknown;
+            readonly data: unknown;
+          }>(query, [after, pageRows])
+          .pipe(Effect.withTracerEnabled(false));
         for (const row of rows) {
           const idx = row.idx;
           if (typeof idx !== "number") {

@@ -201,21 +201,24 @@ export const readOpenCodeUsage = Effect.fn("readOpenCodeUsage")(function* (
         // SqlClient materializes each result with StatementSync.all(), and the
         // window can exclude most rows. Each statement covers MESSAGE_PAGE_SIZE
         // rowids, however few match, and rows appended mid-scan are left out.
+        // Untraced, as a large history runs thousands of them.
         for (let after = firstRowId - 1; after < lastRowId; after += MESSAGE_PAGE_SIZE) {
-          const rows = yield* sql.unsafe<{
-            readonly id: unknown;
-            readonly session_id: unknown;
-            readonly data: unknown;
-            readonly created: unknown;
-          }>(
-            `SELECT id, session_id, data, ${timestamp} AS created
-             FROM ${table} WHERE ${predicates.join(" AND ")} ORDER BY rowid`,
-            [
-              ...(timestamp === "NULL" ? [] : [sinceMs]),
-              after,
-              Math.min(after + MESSAGE_PAGE_SIZE, lastRowId),
-            ],
-          );
+          const rows = yield* sql
+            .unsafe<{
+              readonly id: unknown;
+              readonly session_id: unknown;
+              readonly data: unknown;
+              readonly created: unknown;
+            }>(
+              `SELECT id, session_id, data, ${timestamp} AS created
+               FROM ${table} WHERE ${predicates.join(" AND ")} ORDER BY rowid`,
+              [
+                ...(timestamp === "NULL" ? [] : [sinceMs]),
+                after,
+                Math.min(after + MESSAGE_PAGE_SIZE, lastRowId),
+              ],
+            )
+            .pipe(Effect.withTracerEnabled(false));
           for (const row of rows) {
             append(
               file.records,

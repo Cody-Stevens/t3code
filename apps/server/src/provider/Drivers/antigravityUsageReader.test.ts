@@ -11,6 +11,7 @@ import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Path from "effect/Path";
 import * as SqlClient from "effect/sql/SqlClient";
+import * as Tracer from "effect/Tracer";
 
 import { makeAntigravityUsageCache, readAntigravityUsage } from "./antigravityUsageReader.ts";
 
@@ -502,7 +503,17 @@ describe("readAntigravityUsage", () => {
         }),
       );
       const reads = yield* recordReads;
-      const result = yield* readAntigravityUsage(dir, 0);
+      const spans: Tracer.NativeSpan[] = [];
+      const tracer = Tracer.make({
+        span: (options) => {
+          const span = new Tracer.NativeSpan(options);
+          spans.push(span);
+          return span;
+        },
+      });
+      const result = yield* readAntigravityUsage(dir, 0).pipe(
+        Effect.provideService(Tracer.Tracer, tracer),
+      );
       assert.deepStrictEqual(result.errors, []);
       assert.deepStrictEqual(
         records(result).map((record) => record.dedupeKey),
@@ -510,6 +521,15 @@ describe("readAntigravityUsage", () => {
           ...Array.from({ length: 150 }, (_, idx) => `antigravity:11:s-${idx}`),
           ...Array.from({ length: 3 }, (_, idx) => `antigravity:11:g-${idx}`),
         ],
+      );
+      // Page statements are untraced, so the trace does not grow with the tables.
+      assert.isTrue(spans.some((span) => span.name === "sqlite"));
+      assert.deepStrictEqual(
+        spans.flatMap((span) => {
+          const query = span.attributes.get("db.query.text");
+          return typeof query === "string" && query.includes("rowid > ?") ? [query] : [];
+        }),
+        [],
       );
       for (const [table, total, most] of [
         ["steps", 150, 64],

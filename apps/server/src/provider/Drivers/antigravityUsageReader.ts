@@ -223,6 +223,9 @@ const readDatabase = Effect.fn("readDatabase")(function* (
           }>(query, [after, pageRows])
           .pipe(Effect.withTracerEnabled(false));
         for (const row of rows) {
+          // Skipped here rather than in SQL, so a statement never scans past
+          // more than one page of steps that have no metadata.
+          if (step && row.data === null) continue;
           const idx = row.idx;
           if (typeof idx !== "number") {
             return yield* new AntigravityDatabaseDecodeError({ path });
@@ -252,7 +255,7 @@ const readDatabase = Effect.fn("readDatabase")(function* (
     }
     const steps = tables.has("steps")
       ? yield* readMetadata(
-          "SELECT rowid AS row_id, idx, metadata AS data FROM steps WHERE metadata IS NOT NULL AND rowid > ? ORDER BY rowid LIMIT ?",
+          "SELECT rowid AS row_id, idx, metadata AS data FROM steps WHERE rowid > ? ORDER BY rowid LIMIT ?",
           STEP_PAGE_ROWS,
           true,
         )

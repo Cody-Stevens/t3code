@@ -493,10 +493,11 @@ describe("readAntigravityUsage", () => {
               antigravityGeneration(`g-${idx}`),
             ]);
           }
-          for (let idx = 0; idx < 150; idx++) {
+          // A run of steps without metadata sits between steps with usage.
+          for (let idx = 0; idx < 250; idx++) {
             yield* db.run("INSERT INTO steps (idx, metadata) VALUES (?, ?)", [
               idx,
-              stepUsage(`s-${idx}`),
+              idx >= 75 && idx < 175 ? null : stepUsage(`s-${idx}`),
             ]);
           }
           yield* db.exec("COMMIT");
@@ -518,7 +519,8 @@ describe("readAntigravityUsage", () => {
       assert.deepStrictEqual(
         records(result).map((record) => record.dedupeKey),
         [
-          ...Array.from({ length: 150 }, (_, idx) => `antigravity:11:s-${idx}`),
+          ...Array.from({ length: 75 }, (_, idx) => `antigravity:11:s-${idx}`),
+          ...Array.from({ length: 75 }, (_, idx) => `antigravity:11:s-${idx + 175}`),
           ...Array.from({ length: 3 }, (_, idx) => `antigravity:11:g-${idx}`),
         ],
       );
@@ -531,8 +533,9 @@ describe("readAntigravityUsage", () => {
         }),
         [],
       );
+      // Every row, with metadata or not, comes back through a bounded statement.
       for (const [table, total, most] of [
-        ["steps", 150, 64],
+        ["steps", 250, 64],
         ["gen_metadata", 3, 1],
       ] as const) {
         const rows = reads

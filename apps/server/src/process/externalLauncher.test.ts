@@ -460,7 +460,7 @@ it.effect("reveals a file in File Explorer through PowerShell on Windows", () =>
     const decodedCommand = Buffer.from(encodedCommand, "base64").toString("utf16le");
     assert.equal(
       decodedCommand,
-      "$ProgressPreference = 'SilentlyContinue'; $folderVerb = (Get-ItemProperty -LiteralPath 'Registry::HKEY_CLASSES_ROOT\\Directory\\shell' -ErrorAction SilentlyContinue).'(default)'; if ($folderVerb -and $folderVerb -ne 'none') { Invoke-Item -LiteralPath ([IO.Path]::GetDirectoryName('C:\\workspace with spaces\\media\\author''s clip.mp4')) } else { $ProgressPreference = 'SilentlyContinue'; Start-Process 'explorer.exe' -ArgumentList ('/select,\"' + 'C:\\workspace with spaces\\media\\author''s clip.mp4' + '\"') }",
+      "$ProgressPreference = 'SilentlyContinue'; $folderVerb = (Get-ItemProperty -LiteralPath 'Registry::HKEY_CLASSES_ROOT\\Directory\\shell' -ErrorAction SilentlyContinue).'(default)'; if ($folderVerb -and $folderVerb -ne 'none') { Invoke-Item -LiteralPath 'C:\\workspace with spaces\\media' } else { Start-Process 'explorer.exe' -ArgumentList ('/select,\"' + 'C:\\workspace with spaces\\media\\author''s clip.mp4' + '\"') }",
     );
     assert.equal(spawned.options.shell, false);
     assert.equal(spawned.options.detached, false);
@@ -616,7 +616,7 @@ it.effect.skipIf(windowsHost)(
         const editors = yield* launcher.resolveAvailableEditors();
         yield* launcher.launchEditor({
           editor: "file-manager",
-          cwd: "/home/t3/workspace [draft]/author's $media/clip.mp4",
+          cwd: "/home/t3/workspace [draft]/author's $media/clip|draft.mp4",
           reveal: true,
         });
         return { kind, editors };
@@ -645,7 +645,7 @@ it.effect.skipIf(windowsHost)(
       const decodedCommand = Buffer.from(encodedCommand, "base64").toString("utf16le");
       assert.equal(
         decodedCommand,
-        "$ProgressPreference = 'SilentlyContinue'; $folderVerb = (Get-ItemProperty -LiteralPath 'Registry::HKEY_CLASSES_ROOT\\Directory\\shell' -ErrorAction SilentlyContinue).'(default)'; if ($folderVerb -and $folderVerb -ne 'none') { Invoke-Item -LiteralPath ([IO.Path]::GetDirectoryName('\\\\wsl.localhost\\Ubuntu-24.04\\home\\t3\\workspace [draft]\\author''s $media\\clip.mp4')) } else { $ProgressPreference = 'SilentlyContinue'; Start-Process 'explorer.exe' -ArgumentList ('/select,\"' + '\\\\wsl.localhost\\Ubuntu-24.04\\home\\t3\\workspace [draft]\\author''s $media\\clip.mp4' + '\"') }",
+        "$ProgressPreference = 'SilentlyContinue'; $folderVerb = (Get-ItemProperty -LiteralPath 'Registry::HKEY_CLASSES_ROOT\\Directory\\shell' -ErrorAction SilentlyContinue).'(default)'; if ($folderVerb -and $folderVerb -ne 'none') { Invoke-Item -LiteralPath '\\\\wsl.localhost\\Ubuntu-24.04\\home\\t3\\workspace [draft]\\author''s $media' } else { Start-Process 'explorer.exe' -ArgumentList ('/select,\"' + '\\\\wsl.localhost\\Ubuntu-24.04\\home\\t3\\workspace [draft]\\author''s $media\\clip|draft.mp4' + '\"') }",
       );
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
 );
@@ -808,7 +808,7 @@ it.effect.skipIf(windowsHost)(
         const launcher = yield* ExternalLauncher.ExternalLauncher;
         yield* launcher.launchEditor({
           editor: "file-manager",
-          cwd: '/home/t3/work "quoted"/clip.mp4',
+          cwd: '/home/t3/work/clip "quoted".mp4',
           reveal: true,
         });
       }).pipe(
@@ -828,8 +828,14 @@ it.effect.skipIf(windowsHost)(
       );
 
       assert.ok(spawned);
-      assert.equal(spawned.command, "explorer.exe");
-      assert.deepEqual(spawned.args, ['\\\\wsl.localhost\\Ubuntu-24.04\\home\\t3\\work "quoted"']);
+      assert.equal(spawned.command, "powershell.exe");
+      assert.equal(spawned.options.detached, true);
+      assert.equal(spawned.options.shell, false);
+      const source = Buffer.from(spawned.args.at(-1) ?? "", "base64").toString("utf16le");
+      assert.equal(
+        source,
+        `Invoke-Item -LiteralPath '\\\\wsl.localhost\\Ubuntu-24.04\\home\\t3\\work'`,
+      );
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
 );
 
